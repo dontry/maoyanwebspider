@@ -1,0 +1,109 @@
+import json
+import re
+from datetime import datetime
+import pygal
+from pygal.style import LightColorizedStyle as LCS, RotateStyle as RS
+
+#按值降序统计列表里面的元素的出现次数
+def count_nums_rank(list_object):
+    data_dict = {}
+    keys, values = [], []
+    for key in set(list_object):
+        data_dict[key] = list_object.count(key)
+    sorted_dict = sorted(data_dict.items(), key=lambda item:item[1], 
+        reverse=True)
+    for item in sorted_dict:
+        keys.append(item[0])
+        values.append(item[1])
+    return [keys, values]
+
+#按名字排列获取列表里面的元素的出现次数
+def count_nums(list_object):
+    data_dict = {}
+    keys, values = [], []
+    for key in set(list_object):
+        data_dict[key] = list_object.count(key)
+    sorted_dict = sorted(data_dict.items(), key=lambda item:item[0])
+    for item in sorted_dict:
+        keys.append(item[0])
+        values.append(item[1])
+    return [keys, values]
+
+with open('result.json', 'r', encoding='utf-8') as f:
+    films = json.load(f)
+
+release_times, times, countries = [], [], []
+years, months, weekdays = [], [], []
+for film in films:
+    #获得release_times
+    release_time = film['Releasetime']
+    release_times.append(release_time)
+    
+    #获得times
+    time = re.sub('\(.*?\)', '', release_time)
+    times.append(time)
+    
+    #获得months和weekdays和year(两个1992年的电影缺失年份和日期数据)
+    if len(time)>4:
+        date = datetime.strptime(time, '%Y-%m-%d')
+        month = date.month
+        months.append(month)
+        weekday = date.weekday()
+        weekdays.append(weekday)
+        year = date.year
+        years.append(year)
+    else:
+        years.append(int(year))
+    
+    #获得countries    
+    if '(' in release_time:
+        country = re.search('\((.*?)\)', release_time)
+        countries.append(country.group(1))
+
+#年份、月份、星期几统计
+year_datas = count_nums(years)
+month_datas = count_nums(months)
+weekday_datas = count_nums(weekdays)
+
+#国家和上榜次数统计(68个电影有国家，缺失32个)
+country_datas = count_nums_rank(countries)
+
+#设置图片格式
+my_style = RS('#333366', base_style=LCS)
+
+my_config = pygal.Config()
+my_config.show_legend = False
+
+#年份(条形图)
+hist_1 = pygal.Bar(my_config, x_label_rotation =45, style=my_style)
+hist_1.title = 'Years in which Top 100 films were released'
+hist_1.x_labels = year_datas[0]
+hist_1.y_title = 'The quantity of films released in the year'
+hist_1.add('', year_datas[1])
+hist_1.render_to_file('years_result.svg')
+
+#月份(条形图)
+hist_2 = pygal.Bar(my_config, style=my_style)
+hist_2.title = 'Months in which Top 100 films were released'
+hist_2.x_labels = month_datas[0]
+hist_2.x_title = 'Month'
+hist_2.y_title = 'The quantity of films released in the month'
+hist_2.add('', month_datas[1])
+hist_2.render_to_file('months_result.svg')
+
+#星期(条形图)
+hist_3 = pygal.Bar(my_config, style=my_style)
+hist_3.title = 'Week days in which Top 100 films were released'
+hist_3.x_labels = ['星期一', '星期二', '星期三', '星期四',
+    '星期五', '星期六', '星期日']
+hist_3.y_title = 'The quantity of films released in the week day'
+hist_3.add('', weekday_datas[1])
+hist_3.render_to_file('weekdays_result.svg')
+
+#国家(条形图)降序
+hist_4 = pygal.Bar(my_config, style=my_style)
+hist_4.title = 'Countries in which Top 100 films were released'
+hist_4.x_labels = country_datas[0]
+hist_4.y_title = 'The quantity of films released in the country'
+hist_4.add('', country_datas[1])
+hist_4.render_to_file('countries_result.svg')
